@@ -1,0 +1,17 @@
+[
+  {
+    "arguments": [
+      "./avr-gcc-8.3.0-x64-linux/bin/avr-gcc",
+      "-c",
+      "-Wall",
+      "-Os",
+      "-mmcu=atmega328p",
+      "-o",
+      "main.o",
+      "main.c"
+    ],
+    "directory": "/home/frivermen/git/j1850reader",
+    "file": "/home/frivermen/git/j1850reader/main.c",
+    "output": "/home/frivermen/git/j1850reader/main.o"
+  }
+]
