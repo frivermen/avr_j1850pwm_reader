@@ -17,6 +17,8 @@
 #define delay_clk()  
 #endif // TM1637_SLOW
 
+uint8_t tm1637_buffer[4] = {0};
+
 void tm1637_start() {
   clk_set();
   dio_set();
@@ -80,8 +82,17 @@ void tm1637_init(uint8_t brightness) {
   tm1637_stop();
 }
 
-void tm1637_print(int16_t value) {
-  uint8_t segments[] = { // 0bDGFEDCBA
+void tm1637_char(uint8_t c, uint8_t pos) {
+  tm1637_start();
+  tm1637_send_byte(0xC0 + pos);
+  tm1637_buffer[pos] &= 0b10000000;
+  tm1637_buffer[pos] |= c;
+  tm1637_send_byte(tm1637_buffer[pos]);
+  tm1637_stop();
+}
+
+void tm1637_print(int16_t value, uint8_t pos, uint8_t len) {
+  const uint8_t segments[] = { // 0bDGFEDCBA
   	0x3F, // 0
   	0x06, // 1
   	0x5B, // 2
@@ -93,7 +104,7 @@ void tm1637_print(int16_t value) {
   	0x7F, // 8
   	0x6F  // 9
   };
-  uint8_t string[4] = {0};
+  for (uint8_t i = 0; i < 4; i++) tm1637_buffer[i] &= 0b10000000;
 
   uint8_t sign_flag = 1; // 1 positive, 0 negative
   if (value < 0) {
@@ -101,22 +112,26 @@ void tm1637_print(int16_t value) {
     value = -value;
   }
 
-  for (int8_t i = 3; i >= 0; i--) {
+  for (int8_t i = pos + len - 1; i >= pos; i--) {
     if (value) {
-      string[i] = segments[value % 10];
+      tm1637_buffer[i] |= segments[value % 10];
       value /= 10;
     }
     else {
-      if (i == 3) string[i] = segments[0]; // '0'
-      if (sign_flag == 0) string[i] = 0b01000000; // '-'
+      if (i == pos + len - 1) {
+        tm1637_buffer[i] |= segments[0]; // '0'
+      }
+      if (sign_flag == 0) {
+        tm1637_buffer[i] |= 0b01000000; // '-'
+      }
       break;
     }
   }
    
   tm1637_start();
-  tm1637_send_byte(0xC0); // left digit address
+  tm1637_send_byte(0xC0 + pos); // left digit address
   for (uint8_t l = 0; l < 4; l++) {
-    tm1637_send_byte(string[l]);
+    tm1637_send_byte(tm1637_buffer[l]);
   }
   tm1637_stop();
 }

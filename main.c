@@ -9,7 +9,7 @@
 #include "m328_eeprom.h"
 
 #define MAX_BRIGHTNESS 7
-#define MIN_BRIGHTNESS 0
+#define MIN_BRIGHTNESS 2
 
 volatile uint32_t millis = 0;
 void delay(uint32_t ms) {
@@ -24,7 +24,7 @@ volatile uint8_t speed = 0;
 volatile int8_t temp = -40;
 volatile uint8_t tp = 0;
 
-volatile uint32_t msec = 0;
+volatile uint32_t msec = 9999UL * 3600UL + 3599;
 volatile uint16_t msec_address = 0;
 
 int main() {
@@ -74,9 +74,9 @@ int main() {
   if (backlight) tm1637_init(MIN_BRIGHTNESS);
   else tm1637_init(MAX_BRIGHTNESS);
 
-  tm1637_print(msec / 3600); // print moto-hours 
+  tm1637_print(msec / 3600, 0, 4); // print moto-hours 
   delay(2000);
-  tm1637_print(msec % 3600); 
+  tm1637_print(msec % 3600, 0, 4); 
   delay(1000);
 
   uint32_t disp_upd_counter = 0;
@@ -87,10 +87,11 @@ int main() {
     if (millis - disp_upd_counter > 50) {
       disp_upd_counter = millis;
       if (speed < 20) {
-        tm1637_print(temp);
+        tm1637_print(temp, 0, 3);
+        tm1637_char(0b00111001, 3);
       }
       else {
-        tm1637_print(speed);
+        tm1637_print(speed, 1, 3);
       }
     }
   // set brightness
@@ -105,7 +106,7 @@ int main() {
   // count mhrs
     if ((PIND & (1 << PD5)) && (millis - mhrs_counter > 1000)) {
       mhrs_counter = millis;
-      if (++msec > 9999) msec = 0;
+      // if (++msec > 9999) msec = 0;
     }
   }
 }
@@ -120,7 +121,7 @@ uint8_t compare_arrays(uint8_t* a, uint8_t* b) {
 ISR (TIMER0_COMPA_vect) { // timer0 overflow interrupt
   if (data_pointer) {
     if (compare_arrays((uint8_t*) data, (uint8_t*) spar)) {
-      speed = ((data[4] << 8) | data[5]) >> 2;
+      speed = ((data[4] << 8) | data[5]) / 0x80;
     }
     if (compare_arrays((uint8_t*) data, (uint8_t*) tmar)) {
       temp = data[4] - 40;
@@ -143,6 +144,7 @@ ISR(INT1_vect) { // if int1 falling
   for (uint8_t i = 1; i <= 4; i++) {
     eeprom_write(msec_address + i, (msec >> 8 * (4 - i)) & 0xFF);
   }
-  tm1637_print(msec/3600); // print moto-hours 
+  tm1637_print(msec/3600, 0, 4); // print moto-hours 
   while (!(PIND & (1 << PD3)));
+  if (PIND & (1 << PD4)) tm1637_init(MIN_BRIGHTNESS);
 }
