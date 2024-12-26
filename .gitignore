@@ -1,0 +1,5 @@
+avr-gcc-8.3.0-x64-linux.tar.bz2
+avr-gcc-8.3.0-x64-linux/
+.cache/
+main.o
+main.hex

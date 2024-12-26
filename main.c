@@ -21,7 +21,7 @@ volatile const uint8_t spar[4] = {0xA1, 0x29, 0x10, 0x02};
 volatile const uint8_t tmar[4] = {0x81, 0x49, 0x10, 0x10};
 volatile const uint8_t tpar[4] = {0x81, 0x1B, 0x10, 0x25};
 volatile uint8_t speed = 0;
-volatile int8_t temp = 0;
+volatile int8_t temp = -40;
 volatile uint8_t tp = 0;
 
 volatile uint32_t msec = 0;
