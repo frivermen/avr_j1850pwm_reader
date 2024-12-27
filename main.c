@@ -91,7 +91,7 @@ int main() {
         tm1637_char(0b00111001, 3);
       }
       else {
-        tm1637_print(speed, 1, 3);
+        tm1637_print(speed, 0, 4);
       }
     }
   // set brightness
@@ -106,7 +106,7 @@ int main() {
   // count mhrs
     if ((PIND & (1 << PD5)) && (millis - mhrs_counter > 1000)) {
       mhrs_counter = millis;
-      // if (++msec > 9999) msec = 0;
+      if (++msec > (19999UL * 3600)) msec = (10000UL * 3600);
     }
   }
 }
@@ -121,7 +121,7 @@ uint8_t compare_arrays(uint8_t* a, uint8_t* b) {
 ISR (TIMER0_COMPA_vect) { // timer0 overflow interrupt
   if (data_pointer) {
     if (compare_arrays((uint8_t*) data, (uint8_t*) spar)) {
-      speed = ((data[4] << 8) | data[5]) / 0x80;
+      speed = ((data[4] << 8) | data[5]) >> 7;
     }
     if (compare_arrays((uint8_t*) data, (uint8_t*) tmar)) {
       temp = data[4] - 40;
@@ -145,6 +145,6 @@ ISR(INT1_vect) { // if int1 falling
     eeprom_write(msec_address + i, (msec >> 8 * (4 - i)) & 0xFF);
   }
   tm1637_print(msec/3600, 0, 4); // print moto-hours 
-  while (!(PIND & (1 << PD3)));
+  while (!(PIND & (1 << PD3))); // while ingition off
   if (PIND & (1 << PD4)) tm1637_init(MIN_BRIGHTNESS);
 }
