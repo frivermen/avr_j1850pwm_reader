@@ -91,7 +91,7 @@ void tm1637_char(uint8_t c, uint8_t pos) {
   tm1637_stop();
 }
 
-void tm1637_print(int16_t value, uint8_t pos, uint8_t len) {
+void tm1637_print(int16_t value, uint8_t pos) {
   const uint8_t segments[] = { // 0bDGFEDCBA
   	0x3F, // 0
   	0x06, // 1
@@ -112,13 +112,13 @@ void tm1637_print(int16_t value, uint8_t pos, uint8_t len) {
     value = -value;
   }
 
-  for (int8_t i = pos + len - 1; i >= pos; i--) {
+  for (int8_t i = pos; i >= 0; i--) {
     if (value) {
       tm1637_buffer[i] |= segments[value % 10];
       value /= 10;
     }
     else {
-      if (i == pos + len - 1) {
+      if (i == pos) {
         tm1637_buffer[i] |= segments[0]; // '0'
       }
       if (sign_flag == 0) {
@@ -129,7 +129,7 @@ void tm1637_print(int16_t value, uint8_t pos, uint8_t len) {
   }
    
   tm1637_start();
-  tm1637_send_byte(0xC0 + pos); // left digit address
+  tm1637_send_byte(0xC0); // left digit address
   for (uint8_t l = 0; l < 4; l++) {
     tm1637_send_byte(tm1637_buffer[l]);
   }

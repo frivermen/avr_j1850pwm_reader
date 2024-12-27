@@ -11,6 +11,10 @@
 #define MAX_BRIGHTNESS 7
 #define MIN_BRIGHTNESS 2
 
+#define MIN_MSEC (10000UL*3600UL) // for print "0000"
+#define MAX_MSEC (19999UL*3600UL+3599UL) // for print "9999"
+
+
 volatile uint32_t millis = 0;
 void delay(uint32_t ms) {
   uint32_t now = millis;
@@ -21,11 +25,14 @@ volatile const uint8_t spar[4] = {0xA1, 0x29, 0x10, 0x02};
 volatile const uint8_t tmar[4] = {0x81, 0x49, 0x10, 0x10};
 volatile const uint8_t tpar[4] = {0x81, 0x1B, 0x10, 0x25};
 volatile uint8_t speed = 0;
-volatile int8_t temp = -40;
+volatile int8_t temp = -127;
 volatile uint8_t tp = 0;
 
-volatile uint32_t msec = 9999UL * 3600UL + 3599;
+volatile uint32_t msec = MAX_MSEC;
 volatile uint16_t msec_address = 0;
+volatile uint8_t  msec_rst = 0;
+
+volatile uint8_t backlight = 0;
 
 int main() {
   // setup timer0 to 40us
@@ -57,9 +64,7 @@ int main() {
   DDRD |=  (1 << PD1); // set PD1 as OUTPUT // tm1637 clk
   DDRB |=  (1 << PB3); // set PB3 as OUTPUT // debug
 
-  sei(); // enable interrupts
-
-  // read variable for count moto-hourse
+  // read variable for count moto-hours
   for (uint16_t i = 0; i < 1024; i++) { // search msec in eeprom
     if (eeprom_read(i) == 0x00) { // if find
       msec_address = i;
@@ -70,34 +75,43 @@ int main() {
     }  
   }
 
-  uint8_t backlight = (PIND & (1 << PD4));
+  backlight = (PIND & (1 << PD4));
   if (backlight) tm1637_init(MIN_BRIGHTNESS);
   else tm1637_init(MAX_BRIGHTNESS);
-
-  tm1637_print(msec / 3600, 0, 4); // print moto-hours 
-  delay(2000);
-  tm1637_print(msec % 3600, 0, 4); 
-  delay(1000);
 
   uint32_t disp_upd_counter = 0;
   uint32_t mhrs_counter = 0;
 
+  sei(); // enable interrupts
+
   while (1) {
+  // print moto-hours at start
+    if (millis < 2000 && temp == -127) { // temp need for print once
+      temp++;
+      tm1637_print(msec / 3600, 3); // print moto-hours 
+    }
+    if (millis >= 2000 && millis < 3000 && temp == -126) {
+      temp = -40;
+      tm1637_print(msec % 3600, 3);
+    } 
   // display update
-    if (millis - disp_upd_counter > 50) {
+    if (millis > 3000 && (millis - disp_upd_counter > 50)) {
       disp_upd_counter = millis;
       if (speed < 20) {
-        tm1637_print(temp, 0, 3);
-        tm1637_char(0b00111001, 3);
+        tm1637_print(temp, 2);
+        tm1637_char(0b00111001, 3); // 'C'
       }
       else {
-        tm1637_print(speed, 0, 4);
+        tm1637_print(speed, 3);
       }
     }
   // set brightness
     if ((PIND & (1 << PD4)) && !backlight) { // backlight turn on
       backlight = 1;
       tm1637_init(MIN_BRIGHTNESS);
+      if ((millis < 10000) && (++msec_rst == 4)) { // reset msec if turn on in first 10 sec after start
+        msec = MIN_MSEC;
+      }
     }
     if (!(PIND & (1 << PD4)) && backlight) { // backlight turn off
       backlight = 0;
@@ -106,7 +120,7 @@ int main() {
   // count mhrs
     if ((PIND & (1 << PD5)) && (millis - mhrs_counter > 1000)) {
       mhrs_counter = millis;
-      if (++msec > (19999UL * 3600)) msec = (10000UL * 3600);
+      if (++msec > (MAX_MSEC)) msec = (MIN_MSEC);
     }
   }
 }
@@ -144,7 +158,7 @@ ISR(INT1_vect) { // if int1 falling
   for (uint8_t i = 1; i <= 4; i++) {
     eeprom_write(msec_address + i, (msec >> 8 * (4 - i)) & 0xFF);
   }
-  tm1637_print(msec/3600, 0, 4); // print moto-hours 
+  tm1637_print(msec / 3600, 3); // print moto-hours 
   while (!(PIND & (1 << PD3))); // while ingition off
   if (PIND & (1 << PD4)) tm1637_init(MIN_BRIGHTNESS);
 }
