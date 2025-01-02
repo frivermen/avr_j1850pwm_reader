@@ -6,7 +6,7 @@
 
 #include "j1850pwm.h"
 #include "tm1637.h"
-// #include "m328_eeprom.h"
+#include "m328_eeprom.h"
 // #include "m328_uart.h"
 
 #define MAX_BRIGHTNESS 7
@@ -22,6 +22,10 @@ volatile const uint8_t spar[4] = {0xA1, 0x29, 0x10, 0x02};
 volatile const uint8_t tmar[4] = {0x81, 0x49, 0x10, 0x10};
 volatile uint8_t speed = 0;
 volatile int8_t temp = -40;
+
+volatile uint16_t msec_addr = 0;
+volatile uint32_t msec = 0;
+uint32_t msec_counter = 0;
 
 uint8_t backlight = 0;
 
@@ -42,7 +46,7 @@ int main() {
   EICRA |= (1 << ISC00); // logic change on int0
   EIMSK |= (1 << INT0); // turn on int0
 
-  // setup int0 to falling (ignition)
+  // setup int1 to falling (ignition)
   EICRA |= (1 << ISC11); // logic falling on int1
   EIMSK |= (1 << INT1); // turn on int1
 
@@ -62,6 +66,37 @@ int main() {
   uint32_t disp_upd_counter = 0;
 
   sei(); // enable interrupts
+
+  for (uint16_t a = 0; a < 1024; a++) {
+    uint8_t cell = eeprom_read(a);
+    if (cell == 0x00 && msec_addr == 0x00) {
+      msec_addr = a; 
+      msec |= (uint32_t) eeprom_read(msec_addr + 1) << (8 * 3);
+      msec |= (uint32_t) eeprom_read(msec_addr + 2) << (8 * 2);
+      msec |= (uint32_t) eeprom_read(msec_addr + 3) << (8 * 1);
+      msec |= (uint32_t) eeprom_read(msec_addr + 4) << (8 * 0);
+    }
+  }
+
+  tm1637_print(msec % 3600, 3);
+  delay(2000);
+
+  if (PIND & (1 << PD4)) {
+    uint8_t rev_count = 60;
+    while (rev_count && !(PIND & (1 << PD5)) && (PIND & (1 << PD4))) { // while oil lamp and backlight on
+      tm1637_print(rev_count--, 2);
+      delay(1000);
+    }
+    if (rev_count == 0) {
+      msec = 0;
+      for (uint16_t i = 0; i < 1024; i++) eeprom_write(i, 0xFF); // clear eeprom
+      tm1637_char(0b01011110, 0); // 'd'
+      tm1637_char(0b01011100, 1); // 'o'
+      tm1637_char(0b01010100, 2); // 'n'
+      tm1637_char(0b01111001, 3); // 'E'
+      delay(3000);
+    }
+  }
 
   while (1) {
   // display block
@@ -85,6 +120,13 @@ int main() {
     if (!(PIND & (1 << PD4)) && backlight) { // backlight turn off
       backlight = 0;
       tm1637_init(MAX_BRIGHTNESS);
+    }
+  // moto-hours
+    if ((PIND & (1 << PD5)) && (millis - msec_counter > 1000)) {
+      msec_counter = millis;
+      if (++msec >= 1000UL * 3600) {
+        msec = 0;
+      }
     }
   }
 }
@@ -114,10 +156,15 @@ ISR (TIMER2_COMPA_vect) { // timer2 overflow interrupt
 
 ISR(INT1_vect) { // if int1 falling
   tm1637_init(MAX_BRIGHTNESS);
-  tm1637_char(0b01000000, 0); // '-'
-  tm1637_char(0b01000000, 1);
-  tm1637_char(0b01000000, 2);
-  tm1637_char(0b01000000, 3);
+  eeprom_write(msec_addr, 0xFF);
+  msec_addr++;
+  eeprom_write(msec_addr, 0x00);
+  eeprom_write(msec_addr + 1, (uint8_t) (msec >> (8 * 3)));
+  eeprom_write(msec_addr + 2, (uint8_t) (msec >> (8 * 2)));
+  eeprom_write(msec_addr + 3, (uint8_t) (msec >> (8 * 1)));
+  eeprom_write(msec_addr + 4, (uint8_t) (msec >> (8 * 0)));
+  tm1637_print(msec / 3600, 2);
+  tm1637_char(0b01110110, 3); // 'H'
   while (!(PIND & (1 << PD3))); // while ingition off
   if (PIND & (1 << PD4)) tm1637_init(MIN_BRIGHTNESS);
 }

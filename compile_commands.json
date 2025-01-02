@@ -10,8 +10,8 @@
       "main.o",
       "main.c"
     ],
-    "directory": "/home/frivermen/git/j1850reader",
-    "file": "/home/frivermen/git/j1850reader/main.c",
-    "output": "/home/frivermen/git/j1850reader/main.o"
+    "directory": "/home/frivermen/git/avr_j1850pwm_reader",
+    "file": "/home/frivermen/git/avr_j1850pwm_reader/main.c",
+    "output": "/home/frivermen/git/avr_j1850pwm_reader/main.o"
   }
 ]
